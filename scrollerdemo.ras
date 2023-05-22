@@ -1,0 +1,191 @@
+program ScrollerDemo;
+var
+	@export "resources/charmap.flf" "resources/charmap.bin" 256
+	@export "resources/charimage99x99.flf" "resources/charimage99x99.bin"  256 1
+	
+	charset1 : incbin("resources/charmap.bin", $3800);
+	charset2 : incbin("resources/charmap.bin", $7800);
+	
+	mapData : incbin("resources/charimage99x99.bin", $8000);
+	
+	
+	curBank, time, row : byte = 0;
+	scrollValx, scrollValy: byte = 4;
+	scrollOffsx:byte = 40;
+	scrollOffsy:byte = 30;
+
+	src, dst, map : ^byte;
+	const maxrow : byte = 99;
+	const maxcolumn : byte = 99;
+	//const border_color : byte = black;
+	const border_color : byte = grey;
+	
+	movedir:byte = 0;
+	nextscrollx:integer = 3;
+	nextscrolly:integer = 4; // 0,1,2=-3,-2,-1;  3=0;  4,5,6=1,2,3
+	scx:integer = 3;
+	scy:integer = 3;
+	
+	moveleft:byte = 0;
+	
+procedure movescrollX(nx: byte);
+begin
+	if (scrollOffsx+nx-3>=0 and scrollOffsx+nx-3<maxcolumn-40) then nextscrollx := nx;
+end;
+procedure movescrollY(ny: byte);
+begin
+	if (scrollOffsy+ny-3>=0 and scrollOffsy+ny-3<maxrow-24) then nextscrolly := ny;
+end;
+procedure fire();
+begin
+	nextscrollx := nextscrollx * 2 - 3;
+	nextscrolly := nextscrolly * 2 - 3;
+end;
+
+procedure HandleJoy();
+begin
+	screen_bg_col:=green;
+	readjoy2();
+    if (joy2 & JOY_UP) 		then movescrollY(2);
+    if (joy2 & JOY_DOWN)		then movescrollY(4);
+    if (joy2 & JOY_LEFT) 		then movescrollX(2);
+    if (joy2 & JOY_RIGHT) 	then movescrollX(4);
+    if (joy2 & JOY_FIRE) 		then fire();
+	screen_bg_col:=grey;
+end;
+
+procedure MapPos();
+begin
+	map := #mapData+maxcolumn*scrollOffsy+scrollOffsx;
+end;
+
+/*
+  Update banks when scroll = 8
+  Sets pointers etc
+
+*/
+procedure UpdateBanks();
+begin
+	curBank := (curBank+1)&1;
+
+	if (curBank=0) then
+	begin
+		setbank(vic_bank0);
+		dst:=#screen_char_loc2;
+	end
+	else
+	begin
+		setbank(vic_bank1);
+		dst:=#screen_char_loc;
+	end;
+
+end;
+
+procedure DecideNextMove();
+begin
+	HandleJoy();
+	scy := nextscrolly;
+	scx := nextscrollx;
+	scrollOffsx := scrollOffsx + scx-3;
+	scrollOffsy := scrollOffsy + scy-3;
+	map := MapPos();
+	src:=map;
+	if (scx<>3 or scy<>3) then begin
+		moveleft:=8; // how much move left from the scroll
+		row := 0;
+	end;
+	if (scx=scy and scx<>3) then begin
+		scrollValx := 4;
+		scrollValy := 4
+	end;
+	if (scx<>scy and (scx<>3 and scy<>3)) then begin
+		scrollValx := 4;
+		scrollValy := 5;
+	end;
+	nextscrollx:=3;
+	nextscrolly:=3;
+end;
+
+/*
+	Copy 40 bytes every frame
+*/
+procedure CopyPart();
+begin
+	screen_bg_col:=grey;
+	if (src >= $A649 or row = 25) then return;
+	memcpyunroll(src,0,dst,40);
+	dst+=40;
+	src+=maxcolumn;
+	row+=1;
+end;
+
+
+procedure UpdateScroll();
+begin
+	if (moveleft>0) then moveleft -= 1;
+	scrollValy-=scy-3;
+	scrollValx-=scx-3;
+	if ((scrollValy=9 or scrollValy=0) or (scrollValx=9 or scrollValx=0)) then
+	begin
+		UpdateBanks();
+		scrollValx := mod(scrollValx+7, 8)+1;
+		scrollValy := mod(scrollValy+7, 8)+1;
+	end;
+
+	if (moveleft = 0) then DecideNextMove();
+	// Set scroll value
+	scrolly(scrollValy-1);
+	scrollx(scrollValx-1);
+end;
+	
+interrupt RasterBottom(); forward;
+	
+interrupt Raster();
+begin
+	StartIRQ(0);
+	hidebordery(1);
+	hideborderx(1);
+	UpdateScroll();
+	CopyPart();
+	CopyPart();
+	CopyPart();
+	screen_bg_col:=border_color;
+	time+=1;
+	RasterIRQ(RasterBottom(),246,0);
+	closeirq();
+end;	
+	
+interrupt RasterBottom();
+begin
+	StartIRQ(0);
+	CopyPart();
+	CopyPart();
+	CopyPart();
+	CopyPart();
+	//CopyPart();
+	screen_bg_col:=border_color;
+	RasterIRQ(Raster(),0,0);
+	closeirq();
+end;		
+	
+procedure Init();
+begin
+	clearscreen($20,#screen_char_loc);
+	clearscreen($20,#screen_char_loc2);
+	clearscreen(white,#screen_col_loc);
+	setcharsetlocation($3800);
+	screen_bg_col:=border_color;
+	screen_fg_col:=black;
+end;	
+	
+begin
+	Init();
+	UpdateBanks();
+	DecideNextMove();
+	//CopyFullScreen(src, dst);
+	disableciainterrupts();
+	preventirq();
+	setmemoryconfig(1,0,0);
+	startrasterchain(RasterBottom(),0,0);
+	loop();
+end.

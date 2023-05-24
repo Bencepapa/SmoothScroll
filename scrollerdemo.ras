@@ -8,11 +8,16 @@ var
 	
 	mapData : incbin("resources/charimage99x99.bin", $8000);
 	
+	var i: byte;
 	
 	curBank, time, row : byte = 0;
-	scrollValx, scrollValy: byte = 4;
+	const sOff: byte = 11;
+	const sLow: byte = 10;
+	const sHigh: byte = 19;
+	scrollValx, scrollValy: byte = sOff+3;
 	scrollOffsx:byte = 40;
 	scrollOffsy:byte = 30;
+
 
 	src, dst, map : ^byte;
 	const maxrow : byte = 99;
@@ -23,18 +28,22 @@ var
 	movedir:byte = 0;
 	nextscrollx:integer = 3;
 	nextscrolly:integer = 4; // 0,1,2=-3,-2,-1;  3=0;  4,5,6=1,2,3
+	nextscrollxo:integer = 3;
+	nextscrollyo:integer = 4;	
+	
 	scx:integer = 3;
 	scy:integer = 3;
-	
 	moveleft:byte = 0;
 	
 procedure movescrollX(nx: byte);
 begin
 	if (scrollOffsx+nx-3>=0 and scrollOffsx+nx-3<maxcolumn-40) then nextscrollx := nx;
+	nextscrollxo:=nextscrollx;
 end;
 procedure movescrollY(ny: byte);
 begin
 	if (scrollOffsy+ny-3>=0 and scrollOffsy+ny-3<maxrow-24) then nextscrolly := ny;
+	nextscrollyo:=nextscrolly;
 end;
 procedure fire();
 begin
@@ -86,24 +95,31 @@ begin
 	HandleJoy();
 	scy := nextscrolly;
 	scx := nextscrollx;
-	scrollOffsx := scrollOffsx + scx-3;
-	scrollOffsy := scrollOffsy + scy-3;
+	scrollOffsx := scrollOffsx + nextscrollxo-3;
+	scrollOffsy := scrollOffsy + nextscrollyo-3;
 	map := MapPos();
 	src:=map;
-	if (scx<>3 or scy<>3) then begin
+	if (abs(scx-3)=1 or abs(scy-3)=1) then begin
 		moveleft:=8; // how much move left from the scroll
 		row := 0;
 	end;
+	if (abs(scx-3)=2 or abs(scy-3)=2) then begin
+		moveleft:=4; // how much move left from the scroll
+		row := 0;
+	end;
+
 	if (scx=scy and scx<>3) then begin
-		scrollValx := 4;
-		scrollValy := 4
+		scrollValx := 3+sOff;
+		scrollValy := 3+sOff;
 	end;
 	if (scx<>scy and (scx<>3 and scy<>3)) then begin
-		scrollValx := 4;
-		scrollValy := 5;
+		scrollValx := 3+sOff;
+		scrollValy := 4+sOff;
 	end;
 	nextscrollx:=3;
 	nextscrolly:=3;
+	nextscrollxo:=3;
+	nextscrollyo:=3;
 end;
 
 /*
@@ -125,17 +141,17 @@ begin
 	if (moveleft>0) then moveleft -= 1;
 	scrollValy-=scy-3;
 	scrollValx-=scx-3;
-	if ((scrollValy=9 or scrollValy=0) or (scrollValx=9 or scrollValx=0)) then
+	if ((scrollValy>=sHigh or scrollValy<=sLow) or (scrollValx>=sHigh or scrollValx<=sLow)) then
 	begin
 		UpdateBanks();
-		scrollValx := mod(scrollValx+7, 8)+1;
-		scrollValy := mod(scrollValy+7, 8)+1;
+		scrollValx := mod(scrollValx+8-sOff, 8)+sOff;
+		scrollValy := mod(scrollValy+8-sOff, 8)+sOff;
 	end;
 
 	if (moveleft = 0) then DecideNextMove();
 	// Set scroll value
-	scrolly(scrollValy-1);
-	scrollx(scrollValx-1);
+	scrolly(scrollValy-sOff);
+	scrollx(scrollValx-sOff);
 end;
 	
 interrupt RasterBottom(); forward;
@@ -146,9 +162,10 @@ begin
 	hidebordery(1);
 	hideborderx(1);
 	UpdateScroll();
+	for i:=0 to 20 unroll do
+	begin
 	CopyPart();
-	CopyPart();
-	CopyPart();
+	end;
 	screen_bg_col:=border_color;
 	time+=1;
 	RasterIRQ(RasterBottom(),246,0);
@@ -162,7 +179,7 @@ begin
 	CopyPart();
 	CopyPart();
 	CopyPart();
-	//CopyPart();
+	CopyPart();
 	screen_bg_col:=border_color;
 	RasterIRQ(Raster(),0,0);
 	closeirq();

@@ -26,11 +26,13 @@ scrollOffsx	dc.b	$28
 scrollOffsy	dc.b	$1e
 src	= $02
 dst	= $04
-map	= $08
+colorsrc	= $08
+colordst	= $16
 nextscrollx	dc.w	$03
 nextscrolly	dc.w	$04
 nextscrollxo	dc.w	$03
 nextscrollyo	dc.w	$04
+copycolormem	dc.b	$00
 scx	dc.w	$03
 scy	dc.w	$03
 moveleft	dc.b	$00
@@ -311,11 +313,8 @@ end_procedure_fire
 	; ***********  Defining procedure : HandleJoy
 	;    Procedure type : User-defined procedure
 HandleJoy
-	; Assigning memory location
-	; Forcetype: NADA
-	lda #$5
-	; Calling storevariable on generic assign expression
-	sta $d020
+	
+; //screen_bg_col:=green;
 	jsr callReadJoy2
 	; Binary clause Simplified: NOTEQUALS
 	clc
@@ -455,11 +454,19 @@ MapPos_wordAdd58
 	adc MapPos_rightvarInteger_var60+1
 	tay
 	lda MapPos_rightvarInteger_var60
-	sta map
-	sty map+1
+	sta src
+	sty src+1
+	; INTEGER optimization: a=b+c 
+	clc
+	adc #$49
+	sta colorsrc+0
+	lda src+1
+	adc #$26
+	sta colorsrc+1
 	rts
 end_procedure_MapPos
 	
+; //42569+maxcolumn*scrollOffsy+scrollOffsx;
 ; //  Update banks when scroll = 8
 ; //  Sets pointers etc
 ; //
@@ -485,8 +492,8 @@ UpdateBanks
 	; Binary clause Simplified: EQUALS
 	clc
 	; cmp #$00 ignored
-	bne UpdateBanks_elseblock67
-UpdateBanks_ConditionalTrueBlock66: ;Main true block ;keep 
+	bne UpdateBanks_elseblock68
+UpdateBanks_ConditionalTrueBlock67: ;Main true block ;keep 
 	; Set bank
 	; Forcetype: NADA
 	lda #$3
@@ -495,8 +502,8 @@ UpdateBanks_ConditionalTrueBlock66: ;Main true block ;keep
 	ldx #$44
 	sta dst
 	stx dst+1
-	jmp UpdateBanks_elsedoneblock68
-UpdateBanks_elseblock67
+	jmp UpdateBanks_elsedoneblock69
+UpdateBanks_elseblock68
 	; Set bank
 	; Forcetype: NADA
 	lda #$2
@@ -505,7 +512,7 @@ UpdateBanks_elseblock67
 	ldx #$04
 	sta dst
 	stx dst+1
-UpdateBanks_elsedoneblock68
+UpdateBanks_elsedoneblock69
 	rts
 end_procedure_UpdateBanks
 	; NodeProcedureDecl -1
@@ -527,9 +534,9 @@ DecideNextMove
 	ldy #0
 	; Forcetype: NADA
 	lda #$3
-DecideNextMove_rightvarInteger_var76 = $54
-	sta DecideNextMove_rightvarInteger_var76
-	sty DecideNextMove_rightvarInteger_var76+1
+DecideNextMove_rightvarInteger_var77 = $54
+	sta DecideNextMove_rightvarInteger_var77
+	sty DecideNextMove_rightvarInteger_var77+1
 	; HandleVarBinopB16bit
 	ldy #0 ; ::HandleVarBinopB16bit 0
 	; RHS is pure, optimization
@@ -545,23 +552,23 @@ DecideNextMove_rightvarInteger_var76 = $54
 	pla 
 	; Low bit binop:
 	sec
-	sbc DecideNextMove_rightvarInteger_var76
-DecideNextMove_wordAdd74
-	sta DecideNextMove_rightvarInteger_var76
+	sbc DecideNextMove_rightvarInteger_var77
+DecideNextMove_wordAdd75
+	sta DecideNextMove_rightvarInteger_var77
 	; High-bit binop
 	tya
-	sbc DecideNextMove_rightvarInteger_var76+1
+	sbc DecideNextMove_rightvarInteger_var77+1
 	tay
-	lda DecideNextMove_rightvarInteger_var76
+	lda DecideNextMove_rightvarInteger_var77
 	; Calling storevariable on generic assign expression
 	sta scrollOffsx
 	; Generic 16 bit op
 	ldy #0
 	; Forcetype: NADA
 	lda #$3
-DecideNextMove_rightvarInteger_var80 = $54
-	sta DecideNextMove_rightvarInteger_var80
-	sty DecideNextMove_rightvarInteger_var80+1
+DecideNextMove_rightvarInteger_var81 = $54
+	sta DecideNextMove_rightvarInteger_var81
+	sty DecideNextMove_rightvarInteger_var81+1
 	; HandleVarBinopB16bit
 	ldy #0 ; ::HandleVarBinopB16bit 0
 	; RHS is pure, optimization
@@ -577,22 +584,17 @@ DecideNextMove_rightvarInteger_var80 = $54
 	pla 
 	; Low bit binop:
 	sec
-	sbc DecideNextMove_rightvarInteger_var80
-DecideNextMove_wordAdd78
-	sta DecideNextMove_rightvarInteger_var80
+	sbc DecideNextMove_rightvarInteger_var81
+DecideNextMove_wordAdd79
+	sta DecideNextMove_rightvarInteger_var81
 	; High-bit binop
 	tya
-	sbc DecideNextMove_rightvarInteger_var80+1
+	sbc DecideNextMove_rightvarInteger_var81+1
 	tay
-	lda DecideNextMove_rightvarInteger_var80
+	lda DecideNextMove_rightvarInteger_var81
 	; Calling storevariable on generic assign expression
 	sta scrollOffsy
 	jsr MapPos
-	sta map
-	sty map+1
-	ldx map+1
-	sta src
-	stx src+1
 	; Binary clause Simplified: EQUALS
 	; abs(x) integer
 	; HandleVarBinopB16bit
@@ -609,7 +611,7 @@ DecideNextMove_wordAdd78
 	tay 
 	pla 
 	cpy #127
-	bcc DecideNextMove_abslabel89
+	bcc DecideNextMove_abslabel90
 	pha
 	tya
 	eor #$ff
@@ -618,12 +620,12 @@ DecideNextMove_wordAdd78
 	eor #$ff
 	clc
 	adc #$01
-DecideNextMove_abslabel89
+DecideNextMove_abslabel90
 	; Compare with pure num / var optimization
 	cmp #$1;keep
-	bne DecideNextMove_localfailed87
-	jmp DecideNextMove_ConditionalTrueBlock83
-DecideNextMove_localfailed87: ;keep
+	bne DecideNextMove_localfailed88
+	jmp DecideNextMove_ConditionalTrueBlock84
+DecideNextMove_localfailed88: ;keep
 	; ; logical OR, second chance
 	; Binary clause Simplified: EQUALS
 	; abs(x) integer
@@ -641,7 +643,7 @@ DecideNextMove_localfailed87: ;keep
 	tay 
 	pla 
 	cpy #127
-	bcc DecideNextMove_abslabel91
+	bcc DecideNextMove_abslabel92
 	pha
 	tya
 	eor #$ff
@@ -650,11 +652,13 @@ DecideNextMove_localfailed87: ;keep
 	eor #$ff
 	clc
 	adc #$01
-DecideNextMove_abslabel91
+DecideNextMove_abslabel92
 	; Compare with pure num / var optimization
 	cmp #$1;keep
-	bne DecideNextMove_elsedoneblock85
-DecideNextMove_ConditionalTrueBlock83: ;Main true block ;keep 
+	bne DecideNextMove_elsedoneblock86
+DecideNextMove_ConditionalTrueBlock84: ;Main true block ;keep 
+	
+; //src:=map;
 	; Forcetype: NADA
 	lda #$8
 	; Calling storevariable on generic assign expression
@@ -665,7 +669,7 @@ DecideNextMove_ConditionalTrueBlock83: ;Main true block ;keep
 	lda #$0
 	; Calling storevariable on generic assign expression
 	sta row
-DecideNextMove_elsedoneblock85
+DecideNextMove_elsedoneblock86
 	; Binary clause Simplified: EQUALS
 	; abs(x) integer
 	; HandleVarBinopB16bit
@@ -682,7 +686,7 @@ DecideNextMove_elsedoneblock85
 	tay 
 	pla 
 	cpy #127
-	bcc DecideNextMove_abslabel100
+	bcc DecideNextMove_abslabel101
 	pha
 	tya
 	eor #$ff
@@ -691,12 +695,12 @@ DecideNextMove_elsedoneblock85
 	eor #$ff
 	clc
 	adc #$01
-DecideNextMove_abslabel100
+DecideNextMove_abslabel101
 	; Compare with pure num / var optimization
 	cmp #$2;keep
-	bne DecideNextMove_localfailed98
-	jmp DecideNextMove_ConditionalTrueBlock94
-DecideNextMove_localfailed98: ;keep
+	bne DecideNextMove_localfailed99
+	jmp DecideNextMove_ConditionalTrueBlock95
+DecideNextMove_localfailed99: ;keep
 	; ; logical OR, second chance
 	; Binary clause Simplified: EQUALS
 	; abs(x) integer
@@ -714,7 +718,7 @@ DecideNextMove_localfailed98: ;keep
 	tay 
 	pla 
 	cpy #127
-	bcc DecideNextMove_abslabel102
+	bcc DecideNextMove_abslabel103
 	pha
 	tya
 	eor #$ff
@@ -723,11 +727,11 @@ DecideNextMove_localfailed98: ;keep
 	eor #$ff
 	clc
 	adc #$01
-DecideNextMove_abslabel102
+DecideNextMove_abslabel103
 	; Compare with pure num / var optimization
 	cmp #$2;keep
-	bne DecideNextMove_elsedoneblock96
-DecideNextMove_ConditionalTrueBlock94: ;Main true block ;keep 
+	bne DecideNextMove_elsedoneblock97
+DecideNextMove_ConditionalTrueBlock95: ;Main true block ;keep 
 	; Forcetype: NADA
 	lda #$4
 	; Calling storevariable on generic assign expression
@@ -738,28 +742,28 @@ DecideNextMove_ConditionalTrueBlock94: ;Main true block ;keep
 	lda #$0
 	; Calling storevariable on generic assign expression
 	sta row
-DecideNextMove_elsedoneblock96
+DecideNextMove_elsedoneblock97
 	; Binary clause INTEGER: EQUALS
 	lda scx+1   ; compare high bytes
 	cmp scy+1 ;keep
-	bne DecideNextMove_elsedoneblock107
+	bne DecideNextMove_elsedoneblock108
 	lda scx
 	cmp scy ;keep
-	bne DecideNextMove_elsedoneblock107
-	jmp DecideNextMove_localsuccess109
-DecideNextMove_localsuccess109: ;keep
+	bne DecideNextMove_elsedoneblock108
+	jmp DecideNextMove_localsuccess110
+DecideNextMove_localsuccess110: ;keep
 	; ; logical AND, second requirement
 	; Binary clause INTEGER: NOTEQUALS
 	lda scx+1   ; compare high bytes
 	cmp #$00 ;keep
-	beq DecideNextMove_pass1110
-	jmp DecideNextMove_ConditionalTrueBlock105
-DecideNextMove_pass1110
+	beq DecideNextMove_pass1111
+	jmp DecideNextMove_ConditionalTrueBlock106
+DecideNextMove_pass1111
 	lda scx
 	cmp #$03 ;keep
-	beq DecideNextMove_elsedoneblock107
-	jmp DecideNextMove_ConditionalTrueBlock105
-DecideNextMove_ConditionalTrueBlock105: ;Main true block ;keep 
+	beq DecideNextMove_elsedoneblock108
+	jmp DecideNextMove_ConditionalTrueBlock106
+DecideNextMove_ConditionalTrueBlock106: ;Main true block ;keep 
 	; Forcetype: NADA
 	lda #$e
 	; Calling storevariable on generic assign expression
@@ -767,42 +771,42 @@ DecideNextMove_ConditionalTrueBlock105: ;Main true block ;keep
 	; Forcetype: NADA
 	; Calling storevariable on generic assign expression
 	sta scrollValy
-DecideNextMove_elsedoneblock107
+DecideNextMove_elsedoneblock108
 	; Binary clause INTEGER: NOTEQUALS
 	lda scx+1   ; compare high bytes
 	cmp scy+1 ;keep
-	beq DecideNextMove_pass1118
-	jmp DecideNextMove_localsuccess117
-DecideNextMove_pass1118
+	beq DecideNextMove_pass1119
+	jmp DecideNextMove_localsuccess118
+DecideNextMove_pass1119
 	lda scx
 	cmp scy ;keep
-	beq DecideNextMove_elsedoneblock115
-	jmp DecideNextMove_localsuccess117
-DecideNextMove_localsuccess117: ;keep
+	beq DecideNextMove_elsedoneblock116
+	jmp DecideNextMove_localsuccess118
+DecideNextMove_localsuccess118: ;keep
 	; ; logical AND, second requirement
 	; Binary clause INTEGER: NOTEQUALS
 	lda scx+1   ; compare high bytes
 	cmp #$00 ;keep
-	beq DecideNextMove_pass1120
-	jmp DecideNextMove_localsuccess119
-DecideNextMove_pass1120
+	beq DecideNextMove_pass1121
+	jmp DecideNextMove_localsuccess120
+DecideNextMove_pass1121
 	lda scx
 	cmp #$03 ;keep
-	beq DecideNextMove_elsedoneblock115
-	jmp DecideNextMove_localsuccess119
-DecideNextMove_localsuccess119: ;keep
+	beq DecideNextMove_elsedoneblock116
+	jmp DecideNextMove_localsuccess120
+DecideNextMove_localsuccess120: ;keep
 	; ; logical AND, second requirement
 	; Binary clause INTEGER: NOTEQUALS
 	lda scy+1   ; compare high bytes
 	cmp #$00 ;keep
-	beq DecideNextMove_pass1121
-	jmp DecideNextMove_ConditionalTrueBlock113
-DecideNextMove_pass1121
+	beq DecideNextMove_pass1122
+	jmp DecideNextMove_ConditionalTrueBlock114
+DecideNextMove_pass1122
 	lda scy
 	cmp #$03 ;keep
-	beq DecideNextMove_elsedoneblock115
-	jmp DecideNextMove_ConditionalTrueBlock113
-DecideNextMove_ConditionalTrueBlock113: ;Main true block ;keep 
+	beq DecideNextMove_elsedoneblock116
+	jmp DecideNextMove_ConditionalTrueBlock114
+DecideNextMove_ConditionalTrueBlock114: ;Main true block ;keep 
 	; Forcetype: NADA
 	lda #$e
 	; Calling storevariable on generic assign expression
@@ -811,7 +815,7 @@ DecideNextMove_ConditionalTrueBlock113: ;Main true block ;keep
 	lda #$f
 	; Calling storevariable on generic assign expression
 	sta scrollValy
-DecideNextMove_elsedoneblock115
+DecideNextMove_elsedoneblock116
 	; Forcetype: INTEGER
 	ldy #0   ; Force integer assignment, set y = 0 for values lower than 255
 	lda #$3
@@ -839,30 +843,16 @@ end_procedure_DecideNextMove
 	; ***********  Defining procedure : CopyPart
 	;    Procedure type : User-defined procedure
 CopyPart
-	; Assigning memory location
-	; Forcetype: NADA
-	lda #$c
-	; Calling storevariable on generic assign expression
-	sta $d020
-	; Binary clause INTEGER: GREATEREQUAL
-	lda src+1   ; compare high bytes
-	cmp #$a6 ;keep
-	bcc CopyPart_localfailed129
-	bne CopyPart_ConditionalTrueBlock125
-	lda src
-	cmp #$49 ;keep
-	bcc CopyPart_localfailed129
-	jmp CopyPart_ConditionalTrueBlock125
-CopyPart_localfailed129: ;keep
-	; ; logical OR, second chance
 	; Binary clause Simplified: EQUALS
 	lda row
 	; Compare with pure num / var optimization
 	cmp #$19;keep
-	bne CopyPart_elsedoneblock127
-CopyPart_ConditionalTrueBlock125: ;Main true block ;keep 
+	bne CopyPart_elsedoneblock128
+CopyPart_ConditionalTrueBlock126: ;Main true block ;keep 
+	
+; //screen_bg_col:=grey;
 	rts
-CopyPart_elsedoneblock127
+CopyPart_elsedoneblock128
 	; memcpy unrolled
 	ldy #0
 	lda (src),y
@@ -1004,182 +994,160 @@ CopyPart_WordAdd132
 	inc row
 	rts
 end_procedure_CopyPart
+	
+; //	Copy 40 bytes every frame
+; //
+	; NodeProcedureDecl -1
+	; ***********  Defining procedure : CopyColorPart
+	;    Procedure type : User-defined procedure
+CopyColorPart
+	
+; //screen_bg_col:=red;
+	; memcpy unrolled
+	ldy #0
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	iny
+	lda (colorsrc),y
+	sta (colordst),y
+	lda colordst
+	clc
+	adc #$28
+	sta colordst+0
+	; Optimization : A := A op 8 bit - var and bvar are the same - perform inc
+	bcc CopyColorPart_WordAdd134
+	inc colordst+1
+CopyColorPart_WordAdd134
+	lda colorsrc
+	clc
+	adc #$63
+	sta colorsrc+0
+	; Optimization : A := A op 8 bit - var and bvar are the same - perform inc
+	bcc CopyColorPart_WordAdd135
+	inc colorsrc+1
+CopyColorPart_WordAdd135
+	rts
+end_procedure_CopyColorPart
+	
+; //row+=1;
 	; NodeProcedureDecl -1
 	; ***********  Defining procedure : UpdateScroll
 	;    Procedure type : User-defined procedure
 UpdateScroll
-	; Optimization: replacing a > N with a >= N+1
-	; Binary clause Simplified: GREATEREQUAL
-	lda moveleft
-	; Compare with pure num / var optimization
-	cmp #$1;keep
-	bcc UpdateScroll_elsedoneblock137
-UpdateScroll_ConditionalTrueBlock135: ;Main true block ;keep 
-	; Test Inc dec D
-	dec moveleft
-UpdateScroll_elsedoneblock137
-	; HandleVarBinopB16bit
-	; HandleVarBinopB16bit
-	; RHS is pure, optimization
-	ldy scy+1 ;keep
-	lda scy
-	sec
-	sbc #$03
-	; Testing for byte:  #$00
-	; RHS is word, no optimization
-	pha 
-	tya 
-	sbc #$00
-	tay 
-	pla 
-UpdateScroll_rightvarInteger_var142 = $54
-	sta UpdateScroll_rightvarInteger_var142
-	sty UpdateScroll_rightvarInteger_var142+1
-	lda scrollValy+1
-	sec
-	sbc UpdateScroll_rightvarInteger_var142+1
-	tay
-	lda scrollValy
-	sec
-	sbc UpdateScroll_rightvarInteger_var142
-	bcs UpdateScroll_wordAdd140
-	dey
-UpdateScroll_wordAdd140
-	; Calling storevariable on generic assign expression
-	sta scrollValy
-	; HandleVarBinopB16bit
-	; HandleVarBinopB16bit
-	; RHS is pure, optimization
-	ldy scx+1 ;keep
-	lda scx
-	sec
-	sbc #$03
-	; Testing for byte:  #$00
-	; RHS is word, no optimization
-	pha 
-	tya 
-	sbc #$00
-	tay 
-	pla 
-UpdateScroll_rightvarInteger_var145 = $54
-	sta UpdateScroll_rightvarInteger_var145
-	sty UpdateScroll_rightvarInteger_var145+1
-	lda scrollValx+1
-	sec
-	sbc UpdateScroll_rightvarInteger_var145+1
-	tay
-	lda scrollValx
-	sec
-	sbc UpdateScroll_rightvarInteger_var145
-	bcs UpdateScroll_wordAdd143
-	dey
-UpdateScroll_wordAdd143
-	; Calling storevariable on generic assign expression
-	sta scrollValx
-	; Binary clause Simplified: GREATEREQUAL
-	lda scrollValy
-	; Compare with pure num / var optimization
-	cmp #$13;keep
-	bcc UpdateScroll_localfailed156
-	jmp UpdateScroll_ConditionalTrueBlock147
-UpdateScroll_localfailed156: ;keep
-	; ; logical OR, second chance
-	; Optimization: replacing a <= N with a <= N-1
-	; Binary clause Simplified: LESS
-	lda scrollValy
-	; Compare with pure num / var optimization
-	cmp #$b;keep
-	bcs UpdateScroll_localfailed155
-	jmp UpdateScroll_ConditionalTrueBlock147
-UpdateScroll_localfailed155: ;keep
-	; ; logical OR, second chance
-	; Binary clause Simplified: GREATEREQUAL
-	lda scrollValx
-	; Compare with pure num / var optimization
-	cmp #$13;keep
-	bcc UpdateScroll_localfailed157
-	jmp UpdateScroll_ConditionalTrueBlock147
-UpdateScroll_localfailed157: ;keep
-	; ; logical OR, second chance
-	; Optimization: replacing a <= N with a <= N-1
-	; Binary clause Simplified: LESS
-	lda scrollValx
-	; Compare with pure num / var optimization
-	cmp #$b;keep
-	bcs UpdateScroll_elsedoneblock149
-UpdateScroll_ConditionalTrueBlock147: ;Main true block ;keep 
-	jsr UpdateBanks
-	; 8 bit binop
-	; Add/sub where right value is constant number
-	; Modulo
-	; Forcetype: NADA
-	lda #$8
-UpdateScroll_val_var159 = $54
-	sta UpdateScroll_val_var159
-	; 8 bit binop
-	; Add/sub where right value is constant number
-	; 8 bit binop
-	; Add/sub where right value is constant number
-	lda scrollValx
-	clc
-	; Forcetype: NADA
-	adc #$8
-	 ; end add / sub var with constant
-	sec
-	; Forcetype: NADA
-	sbc #$b
-	 ; end add / sub var with constant
-	sec
-UpdateScroll_modulo160
-	sbc UpdateScroll_val_var159
-	bcs UpdateScroll_modulo160
-	adc UpdateScroll_val_var159
-	clc
-	; Forcetype: NADA
-	adc #$b
-	 ; end add / sub var with constant
-	; Calling storevariable on generic assign expression
-	sta scrollValx
-	; 8 bit binop
-	; Add/sub where right value is constant number
-	; Modulo
-	; Forcetype: NADA
-	lda #$8
-UpdateScroll_val_var161 = $54
-	sta UpdateScroll_val_var161
-	; 8 bit binop
-	; Add/sub where right value is constant number
-	; 8 bit binop
-	; Add/sub where right value is constant number
-	lda scrollValy
-	clc
-	; Forcetype: NADA
-	adc #$8
-	 ; end add / sub var with constant
-	sec
-	; Forcetype: NADA
-	sbc #$b
-	 ; end add / sub var with constant
-	sec
-UpdateScroll_modulo162
-	sbc UpdateScroll_val_var161
-	bcs UpdateScroll_modulo162
-	adc UpdateScroll_val_var161
-	clc
-	; Forcetype: NADA
-	adc #$b
-	 ; end add / sub var with constant
-	; Calling storevariable on generic assign expression
-	sta scrollValy
-UpdateScroll_elsedoneblock149
-	; Binary clause Simplified: EQUALS
-	clc
-	lda moveleft
-	; cmp #$00 ignored
-	bne UpdateScroll_elsedoneblock166
-UpdateScroll_ConditionalTrueBlock164: ;Main true block ;keep 
-	jsr DecideNextMove
-UpdateScroll_elsedoneblock166
 	
 ; // Set scroll value
 	; ScrollY method 
@@ -1209,8 +1177,260 @@ UpdateScroll_elsedoneblock166
 	and #$F8
 	ora $58
 	sta $d016
+	; Optimization: replacing a > N with a >= N+1
+	; Binary clause Simplified: GREATEREQUAL
+	lda moveleft
+	; Compare with pure num / var optimization
+	cmp #$1;keep
+	bcc UpdateScroll_elsedoneblock140
+UpdateScroll_ConditionalTrueBlock138: ;Main true block ;keep 
+	
+; //screen_bg_col:=green;
+	; Test Inc dec D
+	dec moveleft
+UpdateScroll_elsedoneblock140
+	; HandleVarBinopB16bit
+	; HandleVarBinopB16bit
+	; RHS is pure, optimization
+	ldy scy+1 ;keep
+	lda scy
+	sec
+	sbc #$03
+	; Testing for byte:  #$00
+	; RHS is word, no optimization
+	pha 
+	tya 
+	sbc #$00
+	tay 
+	pla 
+UpdateScroll_rightvarInteger_var145 = $54
+	sta UpdateScroll_rightvarInteger_var145
+	sty UpdateScroll_rightvarInteger_var145+1
+	lda scrollValy+1
+	sec
+	sbc UpdateScroll_rightvarInteger_var145+1
+	tay
+	lda scrollValy
+	sec
+	sbc UpdateScroll_rightvarInteger_var145
+	bcs UpdateScroll_wordAdd143
+	dey
+UpdateScroll_wordAdd143
+	; Calling storevariable on generic assign expression
+	sta scrollValy
+	; HandleVarBinopB16bit
+	; HandleVarBinopB16bit
+	; RHS is pure, optimization
+	ldy scx+1 ;keep
+	lda scx
+	sec
+	sbc #$03
+	; Testing for byte:  #$00
+	; RHS is word, no optimization
+	pha 
+	tya 
+	sbc #$00
+	tay 
+	pla 
+UpdateScroll_rightvarInteger_var148 = $54
+	sta UpdateScroll_rightvarInteger_var148
+	sty UpdateScroll_rightvarInteger_var148+1
+	lda scrollValx+1
+	sec
+	sbc UpdateScroll_rightvarInteger_var148+1
+	tay
+	lda scrollValx
+	sec
+	sbc UpdateScroll_rightvarInteger_var148
+	bcs UpdateScroll_wordAdd146
+	dey
+UpdateScroll_wordAdd146
+	; Calling storevariable on generic assign expression
+	sta scrollValx
+	
+; //screen_bg_col:=yellow;
+	; Binary clause Simplified: GREATEREQUAL
+	lda scrollValy
+	; Compare with pure num / var optimization
+	cmp #$13;keep
+	bcc UpdateScroll_localfailed159
+	jmp UpdateScroll_ConditionalTrueBlock150
+UpdateScroll_localfailed159: ;keep
+	; ; logical OR, second chance
+	; Optimization: replacing a <= N with a <= N-1
+	; Binary clause Simplified: LESS
+	lda scrollValy
+	; Compare with pure num / var optimization
+	cmp #$b;keep
+	bcs UpdateScroll_localfailed158
+	jmp UpdateScroll_ConditionalTrueBlock150
+UpdateScroll_localfailed158: ;keep
+	; ; logical OR, second chance
+	; Binary clause Simplified: GREATEREQUAL
+	lda scrollValx
+	; Compare with pure num / var optimization
+	cmp #$13;keep
+	bcc UpdateScroll_localfailed160
+	jmp UpdateScroll_ConditionalTrueBlock150
+UpdateScroll_localfailed160: ;keep
+	; ; logical OR, second chance
+	; Optimization: replacing a <= N with a <= N-1
+	; Binary clause Simplified: LESS
+	lda scrollValx
+	; Compare with pure num / var optimization
+	cmp #$b;keep
+	bcs UpdateScroll_elsedoneblock152
+UpdateScroll_ConditionalTrueBlock150: ;Main true block ;keep 
+	
+; //UpdateBanks();
+	; 8 bit binop
+	; Add/sub where right value is constant number
+	; Modulo
+	; Forcetype: NADA
+	lda #$8
+UpdateScroll_val_var162 = $54
+	sta UpdateScroll_val_var162
+	; 8 bit binop
+	; Add/sub where right value is constant number
+	; 8 bit binop
+	; Add/sub where right value is constant number
+	lda scrollValx
+	clc
+	; Forcetype: NADA
+	adc #$8
+	 ; end add / sub var with constant
+	sec
+	; Forcetype: NADA
+	sbc #$b
+	 ; end add / sub var with constant
+	sec
+UpdateScroll_modulo163
+	sbc UpdateScroll_val_var162
+	bcs UpdateScroll_modulo163
+	adc UpdateScroll_val_var162
+	clc
+	; Forcetype: NADA
+	adc #$b
+	 ; end add / sub var with constant
+	; Calling storevariable on generic assign expression
+	sta scrollValx
+	; 8 bit binop
+	; Add/sub where right value is constant number
+	; Modulo
+	; Forcetype: NADA
+	lda #$8
+UpdateScroll_val_var164 = $54
+	sta UpdateScroll_val_var164
+	; 8 bit binop
+	; Add/sub where right value is constant number
+	; 8 bit binop
+	; Add/sub where right value is constant number
+	lda scrollValy
+	clc
+	; Forcetype: NADA
+	adc #$8
+	 ; end add / sub var with constant
+	sec
+	; Forcetype: NADA
+	sbc #$b
+	 ; end add / sub var with constant
+	sec
+UpdateScroll_modulo165
+	sbc UpdateScroll_val_var164
+	bcs UpdateScroll_modulo165
+	adc UpdateScroll_val_var164
+	clc
+	; Forcetype: NADA
+	adc #$b
+	 ; end add / sub var with constant
+	; Calling storevariable on generic assign expression
+	sta scrollValy
+	; Forcetype: NADA
+	lda #$1
+	; Calling storevariable on generic assign expression
+	sta copycolormem
+UpdateScroll_elsedoneblock152
+	; Binary clause Simplified: EQUALS
+	clc
+	lda moveleft
+	; cmp #$00 ignored
+	bne UpdateScroll_elsedoneblock169
+UpdateScroll_ConditionalTrueBlock167: ;Main true block ;keep 
+	jsr DecideNextMove
+UpdateScroll_elsedoneblock169
 	rts
 end_procedure_UpdateScroll
+	; NodeProcedureDecl -1
+	; ***********  Defining procedure : RasterSwitchScreens
+	;    Procedure type : User-defined procedure
+RasterSwitchScreens
+	; StartIRQ
+	pha
+	txa
+	pha
+	tya
+	pha
+	asl $d019
+	
+; //screen_bg_col:=red;
+	; Test Inc dec D
+	inc time
+	lda #$00
+	ldx #$d8
+	sta colordst
+	stx colordst+1
+	; Unrolled loop
+	jsr CopyColorPart
+	jsr CopyColorPart
+	jsr CopyColorPart
+	jsr CopyColorPart
+	jsr CopyColorPart
+	jsr CopyColorPart
+	jsr CopyColorPart
+	jsr CopyColorPart
+	jsr CopyColorPart
+	jsr CopyColorPart
+	jsr CopyColorPart
+	jsr CopyColorPart
+	jsr CopyColorPart
+	jsr CopyColorPart
+	jsr CopyColorPart
+	jsr CopyColorPart
+	jsr CopyColorPart
+	jsr CopyColorPart
+	jsr CopyColorPart
+	jsr CopyColorPart
+	jsr CopyColorPart
+	jsr CopyColorPart
+	jsr CopyColorPart
+	jsr CopyColorPart
+	jsr CopyColorPart
+	jsr UpdateScroll
+	jsr UpdateBanks
+	;for i:=0 to 5 unroll do
+; //	begin
+; //		CopyColorPart();
+; //	end;
+	; Forcetype: NADA
+	lda #$0
+	; Calling storevariable on generic assign expression
+	sta copycolormem
+	; RasterIRQ : Hook a procedure
+	; Forcetype: NADA
+	lda #$f6
+	sta $d012
+	lda #<RasterBottom
+	sta $fffe
+	lda #>RasterBottom
+	sta $ffff
+	; CloseIRQ
+	pla
+	tay
+	pla
+	tax
+	pla
+	rti
+end_procedure_RasterSwitchScreens
 	; NodeProcedureDecl -1
 	; ***********  Defining procedure : Raster
 	;    Procedure type : User-defined procedure
@@ -1222,6 +1442,8 @@ Raster
 	tya
 	pha
 	asl $d019
+	; Test Inc dec D
+	inc time
 	lda $D011
 	and #%11110111
 	sta $D011
@@ -1229,6 +1451,26 @@ Raster
 	and #%11110111
 	sta $D016
 	jsr UpdateScroll
+	; Binary clause Simplified: NOTEQUALS
+	clc
+	lda copycolormem
+	; cmp #$00 ignored
+	beq Raster_elseblock201
+Raster_ConditionalTrueBlock200: ;Main true block ;keep 
+	;for i:=0 to 2 unroll do
+; //		begin
+; //		CopyPart();
+; //		end;
+	; RasterIRQ : Hook a procedure
+	; Forcetype: NADA
+	lda #$3c
+	sta $d012
+	lda #<RasterSwitchScreens
+	sta $fffe
+	lda #>RasterSwitchScreens
+	sta $ffff
+	jmp Raster_elsedoneblock202
+Raster_elseblock201
 	; Unrolled loop
 	jsr CopyPart
 	jsr CopyPart
@@ -1250,13 +1492,10 @@ Raster
 	jsr CopyPart
 	jsr CopyPart
 	jsr CopyPart
-	; Assigning memory location
 	; Forcetype: NADA
 	lda #$c
 	; Calling storevariable on generic assign expression
 	sta $d020
-	; Test Inc dec D
-	inc time
 	; RasterIRQ : Hook a procedure
 	; Forcetype: NADA
 	lda #$f6
@@ -1265,6 +1504,7 @@ Raster
 	sta $fffe
 	lda #>RasterBottom
 	sta $ffff
+Raster_elsedoneblock202
 	; CloseIRQ
 	pla
 	tay
@@ -1284,6 +1524,8 @@ RasterBottom
 	tya
 	pha
 	asl $d019
+	
+; //	UpdateScroll();
 	jsr CopyPart
 	jsr CopyPart
 	jsr CopyPart
@@ -1318,35 +1560,35 @@ Init
 	; Forcetype: NADA
 	lda #$20
 	ldx #$fa
-Init_clearloop192
+Init_clearloop249
 	dex
 	sta $0000+$400,x
 	sta $00fa+$400,x
 	sta $01f4+$400,x
 	sta $02ee+$400,x
-	bne Init_clearloop192
+	bne Init_clearloop249
 	; Clear screen with offset
 	; Forcetype: NADA
 	lda #$20
 	ldx #$fa
-Init_clearloop193
+Init_clearloop250
 	dex
 	sta $0000+$4400,x
 	sta $00fa+$4400,x
 	sta $01f4+$4400,x
 	sta $02ee+$4400,x
-	bne Init_clearloop193
+	bne Init_clearloop250
 	; Clear screen with offset
 	; Forcetype: NADA
 	lda #$1
 	ldx #$fa
-Init_clearloop194
+Init_clearloop251
 	dex
 	sta $0000+$d800,x
 	sta $00fa+$d800,x
 	sta $01f4+$d800,x
 	sta $02ee+$d800,x
-	bne Init_clearloop194
+	bne Init_clearloop251
 	lda $d018
 	and #%11110001
 	ora #14
@@ -1365,6 +1607,8 @@ Init_clearloop194
 end_procedure_Init
 block1
 main_block_begin_
+	
+; //_test();
 	jsr Init
 	jsr UpdateBanks
 	jsr DecideNextMove

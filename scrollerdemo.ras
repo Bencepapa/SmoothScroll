@@ -7,6 +7,9 @@ var
 	charset2 : incbin("resources/charmap.bin", $7800);
 	
 	mapData : incbin("resources/charimage99x99.bin", $8000);
+	const maxrow : byte = 99;
+	const maxcolumn : byte = 99;
+	@define colorData $A649
 	
 	var i: byte;
 	
@@ -19,9 +22,8 @@ var
 	scrollOffsy:byte = 30;
 
 
-	src, dst, map : ^byte;
-	const maxrow : byte = 99;
-	const maxcolumn : byte = 99;
+	src, dst, colorsrc, colordst : ^byte;
+
 	//const border_color : byte = black;
 	const border_color : byte = grey;
 	
@@ -30,6 +32,8 @@ var
 	nextscrolly:integer = 4; // 0,1,2=-3,-2,-1;  3=0;  4,5,6=1,2,3
 	nextscrollxo:integer = 3;
 	nextscrollyo:integer = 4;	
+	
+	copycolormem: byte = 0;
 	
 	scx:integer = 3;
 	scy:integer = 3;
@@ -53,7 +57,7 @@ end;
 
 procedure HandleJoy();
 begin
-	screen_bg_col:=green;
+	//screen_bg_col:=green;
 	readjoy2();
     if (joy2 & JOY_UP) 		then movescrollY(2);
     if (joy2 & JOY_DOWN)		then movescrollY(4);
@@ -65,7 +69,8 @@ end;
 
 procedure MapPos();
 begin
-	map := #mapData+maxcolumn*scrollOffsy+scrollOffsx;
+	src := #mapData+maxcolumn*scrollOffsy+scrollOffsx;
+	colorsrc := src + maxColumn*maxRow; //@colorData+maxcolumn*scrollOffsy+scrollOffsx;
 end;
 
 /*
@@ -97,8 +102,8 @@ begin
 	scx := nextscrollx;
 	scrollOffsx := scrollOffsx + nextscrollxo-3;
 	scrollOffsy := scrollOffsy + nextscrollyo-3;
-	map := MapPos();
-	src:=map;
+	MapPos();
+	//src:=map;
 	if (abs(scx-3)=1 or abs(scy-3)=1) then begin
 		moveleft:=8; // how much move left from the scroll
 		row := 0;
@@ -107,7 +112,6 @@ begin
 		moveleft:=4; // how much move left from the scroll
 		row := 0;
 	end;
-
 	if (scx=scy and scx<>3) then begin
 		scrollValx := 3+sOff;
 		scrollValy := 3+sOff;
@@ -127,54 +131,103 @@ end;
 */
 procedure CopyPart();
 begin
-	screen_bg_col:=grey;
-	if (src >= $A649 or row = 25) then return;
+	//screen_bg_col:=grey;
+	if (row = 25) then return;
 	memcpyunroll(src,0,dst,40);
 	dst+=40;
 	src+=maxcolumn;
 	row+=1;
 end;
 
+/*
+	Copy 40 bytes every frame
+*/
+procedure CopyColorPart();
+begin
+	//screen_bg_col:=red;
+	memcpyunroll(colorsrc,0,colordst,40);
+	colordst+=40;
+	colorsrc+=maxcolumn;
+	//row+=1;
+end;
 
 procedure UpdateScroll();
 begin
+	// Set scroll value
+	scrolly(scrollValy-sOff);
+	scrollx(scrollValx-sOff);
+	//screen_bg_col:=green;
+
 	if (moveleft>0) then moveleft -= 1;
 	scrollValy-=scy-3;
 	scrollValx-=scx-3;
 	if ((scrollValy>=sHigh or scrollValy<=sLow) or (scrollValx>=sHigh or scrollValx<=sLow)) then
 	begin
-		UpdateBanks();
+		//UpdateBanks();
 		scrollValx := mod(scrollValx+8-sOff, 8)+sOff;
 		scrollValy := mod(scrollValy+8-sOff, 8)+sOff;
+		copycolormem := true;
+		//screen_bg_col:=yellow;
 	end;
-
 	if (moveleft = 0) then DecideNextMove();
-	// Set scroll value
-	scrolly(scrollValy-sOff);
-	scrollx(scrollValx-sOff);
+
 end;
-	
+
 interrupt RasterBottom(); forward;
+
+interrupt Raster(); forward;
+
+interrupt RasterSwitchScreens(); 
+begin
+	StartIRQ(0);
+	//screen_bg_col:=red;
+	time+=1;
+	colordst := #screen_col_loc;
+	for i:=0 to 25 unroll do
+	begin
+		CopyColorPart();
+	end;
+	UpdateScroll();
+	UpdateBanks();
+	/*for i:=0 to 5 unroll do
+	begin
+		CopyColorPart();
+	end;*/
+	copycolormem := false;
+	RasterIRQ(RasterBottom(),246,0);
+	closeirq();
+end;
 	
 interrupt Raster();
 begin
 	StartIRQ(0);
+	time+=1;
 	hidebordery(1);
 	hideborderx(1);
 	UpdateScroll();
-	for i:=0 to 20 unroll do
+	if (copycolormem=true) then
 	begin
-	CopyPart();
+		/*for i:=0 to 2 unroll do
+		begin
+		CopyPart();
+		end;*/
+		RasterIRQ(RasterSwitchScreens(),60,0);
+	end else begin
+		//screen_bg_col:=purple;
+		for i:=0 to 20 unroll do
+		begin
+			CopyPart();
+		end;
+		screen_bg_col:=border_color;
+		RasterIRQ(RasterBottom(),246,0);
 	end;
-	screen_bg_col:=border_color;
-	time+=1;
-	RasterIRQ(RasterBottom(),246,0);
 	closeirq();
 end;	
 	
 interrupt RasterBottom();
 begin
 	StartIRQ(0);
+	//	UpdateScroll();
 	CopyPart();
 	CopyPart();
 	CopyPart();
@@ -184,7 +237,29 @@ begin
 	RasterIRQ(Raster(),0,0);
 	closeirq();
 end;		
-	
+
+procedure _test();
+begin
+	MapPos();
+	//src:=map;
+	dst:=#screen_char_loc;
+	colordst := #screen_col_loc;
+	//colorsrc := @colorData;
+		disableciainterrupts();
+	preventirq();
+	setmemoryconfig(1,0,0);
+	for i:=0 to 25 unroll do
+	begin
+		CopyPart();
+	end;
+	for i:=0 to 25 unroll do
+	begin
+		CopyColorPart();
+	end;
+	//UpdateBanks();
+	loop();	
+end;
+
 procedure Init();
 begin
 	clearscreen($20,#screen_char_loc);
@@ -193,6 +268,7 @@ begin
 	setcharsetlocation($3800);
 	screen_bg_col:=border_color;
 	screen_fg_col:=black;
+//_test();
 end;	
 	
 begin
